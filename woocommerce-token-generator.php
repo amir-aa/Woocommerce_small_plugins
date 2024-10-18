@@ -74,3 +74,40 @@ function wctg_add_token_to_account_page() {
 }
 add_action('woocommerce_account_dashboard', 'wctg_add_token_to_account_page');
 
+//------------------------------------------- Register the API route
+function wctg_register_api_routes() {
+    register_rest_route('wctg/v1', '/check-token/', array(
+        'methods'  => 'GET',
+        'callback' => 'wctg_check_token_status',
+        'permission_callback' => function () {
+            return is_user_logged_in(); // Ensure the user is logged in
+        },
+    ));
+}
+add_action('rest_api_init', 'wctg_register_api_routes');
+
+// The callback function for the API route
+function wctg_check_token_status(WP_REST_Request $request) {
+    $user_id = get_current_user_id(); // Get the currently logged-in user ID
+
+    if (wctg_is_token_valid($user_id)) {
+        $expiration = get_user_meta($user_id, 'wctg_token_expiration', true);
+        return new WP_REST_Response(array(
+            'status' => 'valid',
+            'expiration' => $expiration
+        ), 200);
+    } else {
+        return new WP_REST_Response(array(
+            'status' => 'expired or not found'
+        ), 200);
+    }
+}
+
+// Check if token is valid
+function wctg_is_token_valid($user_id) {
+    $expiration = get_user_meta($user_id, 'wctg_token_expiration', true);
+    if ($expiration && strtotime($expiration) > time()) {
+        return true; // Token is still valid
+    }
+    return false; // Token is expired or doesn't exist
+}
